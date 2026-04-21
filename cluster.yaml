@@ -56,7 +56,7 @@ managedNodeGroups:
     minSize: 2
     maxSize: 2
     #Taille disque par noeud (GiB) (db needs more storage)
-    volumeSize: 50
+    volumeSize: 40
     amiFamily: AmazonLinux2023
     labels:
       role: worker
