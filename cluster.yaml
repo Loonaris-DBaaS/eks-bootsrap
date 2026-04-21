@@ -1,0 +1,92 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  #name of our cluster EKS
+  name: loonaris-db-cluster
+  region: eu-west-3
+  version: "1.30"
+  #tags metier utilises pour couts, inventaire et gouvernance.
+  tags:
+    Project: loonaris
+    Service: database-as-a-service
+    Environment: production
+
+vpc:
+  #CIDR principal du VPC
+  cidr: 10.0.0.0/16
+  clusterEndpoints:
+    #Endpoint public active 
+    publicAccess: true
+    #Endpoint prive active 
+    privateAccess: true
+  #2 AZ for HA
+  availabilityZones: [eu-west-3a, eu-west-3b]
+
+iam:
+  # permissions IAM
+  withOIDC: true
+  serviceAccounts:
+    #cert-manager: autorise la gestion DNS (Route53) pour les challenges ACME. //to configure later
+    - metadata:
+        name: cert-manager
+        namespace: cert-manager
+      attachPolicyARNs:
+        - arn:aws:iam::474741569968:policy/CertManagerRoute53Policy
+
+    #externalDNS: met a jour automatiquement les enregistrements DNS Route53.
+    - metadata:
+        name: external-dns
+        namespace: external-dns
+      attachPolicyARNs:
+        - arn:aws:iam::474741569968:policy/ExternalDNSRoute53Policy
+
+    #AWS Load Balancer Controller: cree et gere ALB/NLB depuis les Ingress/Service.
+    - metadata:
+        name: aws-load-balancer-controller
+        namespace: kube-system
+      wellKnownPolicies:
+        awsLoadBalancerController: true
+
+#nodes config
+managedNodeGroups:
+  - name: nodesGroup
+  #t3.medium n'est pas supporté pour freetier
+    instanceType: c7i.flex.large
+    #2 noeuds exactement
+    desiredCapacity: 2
+    minSize: 2
+    maxSize: 2
+    #Taille disque par noeud (GiB) (db needs more storage)
+    volumeSize: 50
+    amiFamily: AmazonLinux3
+    labels:
+      role: worker
+      workload: database
+    tags:
+      Project: loonaris
+      Component: database-nodes
+    #noeuds uniquement en reseau prive (pas d'IP publique sur les workers).
+    privateNetworking: true
+
+addons:
+  #Plugin reseau AWS VPC CNI.
+  - name: vpc-cni
+    version: latest
+    configurationValues:
+      #NetworkPolicy desactivé pour eviter problemes avec Calico 
+      enableNetworkPolicy: "false"
+
+  # DNS interne du cluster.
+  - name: coredns
+    version: latest
+
+  # Routage reseau Kubernetes (iptables/ipvs selon config).
+  - name: kube-proxy
+    version: latest
+
+  # Driver CSI EBS pour provisionner des volumes persistants AWS EBS.
+  - name: aws-ebs-csi-driver
+    version: latest
+    wellKnownPolicies:
+      ebsCsiController: true
