@@ -50,7 +50,7 @@ iam:
 managedNodeGroups:
   - name: nodesGroup
     #t3.medium n'est pas supporté pour freetier
-    instanceType: c7i.flex.large
+    instanceType: c7i-flex.large
     #2 noeuds exactement
     desiredCapacity: 2
     minSize: 2
