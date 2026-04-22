@@ -6,7 +6,7 @@ metadata:
   #name of our cluster EKS
   name: loonaris-db-cluster
   region: eu-west-3
-  version: "1.32"
+  version: "1.33"
   #tags metier utilises pour couts, inventaire et gouvernance.
   tags:
     Project: loonaris

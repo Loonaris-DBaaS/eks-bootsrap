@@ -5,7 +5,7 @@ kind: ClusterConfig
 metadata:
   name: loonaris-db-cluster
   region: eu-west-3
-  version: "1.32"
+  version: "1.33"
   tags:
     Project: loonaris
     Service: database-as-a-service
