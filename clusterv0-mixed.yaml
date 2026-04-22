@@ -1,0 +1,104 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/eksctl-io/eksctl/main/pkg/apis/eksctl.io/v1alpha5/assets/schema.json
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: loonaris-db-cluster
+  region: eu-west-3
+  version: "1.32"
+  tags:
+    Project: loonaris
+    Service: database-as-a-service
+    Environment: production
+
+vpc:
+  cidr: 10.0.0.0/16
+  clusterEndpoints:
+    publicAccess: true
+    privateAccess: true
+iam:
+  # permissions IAM
+  withOIDC: true
+  serviceAccounts:
+    #cert-manager: autorise la gestion DNS (Route53) pour les challenges ACME. //to configure later
+    - metadata:
+        name: cert-manager
+        namespace: cert-manager
+      wellKnownPolicies:
+        certManager: true
+
+    #externalDNS: met a jour automatiquement les enregistrements DNS Route53.
+    - metadata:
+        name: external-dns
+        namespace: external-dns
+      wellKnownPolicies:
+        externalDNS: true
+
+    #AWS Load Balancer Controller: cree et gere ALB/NLB depuis les Ingress/Service.
+    - metadata:
+        name: aws-load-balancer-controller
+        namespace: kube-system
+      wellKnownPolicies:
+        awsLoadBalancerController: true
+
+#nodes config
+managedNodeGroups:
+  # 2 node (core k8s).
+  - name: system-ng
+    instanceType: c7i-flex.large
+    desiredCapacity: 1
+    minSize: 1
+    maxSize: 1
+    volumeSize: 30
+    amiFamily: AmazonLinux2023
+    labels:
+      role: system
+      pool: system
+    tags:
+      Project: loonaris
+      Component: system-nodes
+    privateNetworking: true
+    availabilityZones: [eu-west-3a]
+
+  # 2 nodes (dbs).
+  - name: workload-ng
+    instanceType: t3.small
+    desiredCapacity: 2
+    minSize: 2
+    maxSize: 2
+    volumeSize: 30
+    amiFamily: AmazonLinux2023
+    labels:
+      role: worker
+      pool: workload
+      workload: database
+    taints:
+      - key: dedicated
+        value: workload
+        effect: NoSchedule
+    tags:
+      Project: loonaris
+      Component: workload-nodes
+    privateNetworking: true
+    availabilityZones: [eu-west-3a, eu-west-3b]
+
+addons:
+  #Plugin reseau AWS VPC CNI.
+  - name: vpc-cni
+    version: latest
+    #NetworkPolicy desactive pour eviter problemes avec Calico
+    configurationValues: '{"enableNetworkPolicy":"false"}'
+
+  # DNS interne du cluster.
+  - name: coredns
+    version: latest
+
+  # Routage reseau Kubernetes (iptables/ipvs selon config).
+  - name: kube-proxy
+    version: latest
+
+  # Driver CSI EBS pour provisionner des volumes persistants AWS EBS.
+  - name: aws-ebs-csi-driver
+    version: latest
+    wellKnownPolicies:
+      ebsCSIController: true
