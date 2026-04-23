@@ -1,0 +1,9 @@
+apiVersion: operator.tigera.io/v1
+kind: Installation
+metadata:
+  name: default
+spec:
+  # Mode policy-only : Calico ne touche pas au réseau
+  # Le VPC CNI garde la main sur les IPs et le routing AWS
+  cni:
+    type: AmazonVPC
