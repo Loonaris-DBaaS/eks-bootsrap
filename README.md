@@ -117,3 +117,26 @@ eksctl delete cluster --name loonaris-db-cluster --region eu-west-3
 - `only 0 zones discovered`: instance type not available in selected AZs.
 - `AccessDenied`: missing IAM permissions for EKS/EC2/CloudFormation/IAM.
 - `kubectl` cannot connect: rerun `aws eks update-kubeconfig ...` and verify AWS credentials/profile.
+
+## 6. Multi-Tenant NetworkPolicies (Calico)
+
+This repository now includes a reusable tenant template:
+
+- `calico/networkpolicies-template.yaml`
+- `calico/apply-tenant-networkpolicies.sh`
+
+Apply policies for multiple tenant namespaces:
+
+```bash
+bash calico/apply-tenant-networkpolicies.sh tenant-1 tenant-2 tenant-3
+```
+
+Requirements:
+
+- `kubectl`
+- `envsubst` (from `gettext`)
+
+Notes:
+
+- `tenant-isolation` and `deny-cross-tenant` are rendered per tenant namespace.
+- `sni-router-egress` remains a shared policy in namespace `sni-router`.
