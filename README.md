@@ -132,3 +132,4 @@ eksctl delete cluster --name loonaris-db-cluster --region eu-west-3
 - `AccessDenied` — missing IAM permissions for EKS / EC2 / CloudFormation / IAM.
 - `kubectl` cannot connect — rerun `aws eks update-kubeconfig ...` and verify AWS credentials.
 - User can't access cluster after script — confirm both access entry (Step 3.1) and `aws-auth` patch (Step 3.2) succeeded in the script output.
+
