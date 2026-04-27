@@ -1,0 +1,8 @@
+.env
+.claude
+.vscode
+.idea
+*.log
+*.tmp
+*.bak
+*.swp
