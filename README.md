@@ -1,18 +1,40 @@
-# EKS Bootstrap Guide
+# EKS Bootstrap — loonaris-db-cluster
 
-This repository contains an `eksctl` cluster definition in `cluster<version>.yaml`.
+Cluster definition and admin tooling for the loonaris EKS cluster on AWS (`eu-west-3`).
 
-## 0. Connect To Cluster (Developer First)
+| | |
+|---|---|
+| Cluster | `loonaris-db-cluster` |
+| Region | `eu-west-3` |
+| Kubernetes | `1.35` |
 
-Use this first if the cluster already exists.
+## Versions
 
-Check cluster state:
+All versions are pinned — never `latest` in production.
+
+| Component | Version | Notes |
+|---|---|---|
+| Kubernetes | `1.35` | Latest EKS release (Jan 2026), standard support until ~Mar 2027 |
+| vpc-cni | `v1.21.1-eksbuild.7` | Latest patch for 1.35 |
+| coredns | `v1.14.2-eksbuild.4` | Latest available for 1.35 |
+| kube-proxy | `v1.35.3-eksbuild.5` | Tracks Kubernetes minor version |
+| aws-ebs-csi-driver | `v1.59.0-eksbuild.1` | Latest stable |
+| CloudNativePG | `1.29.0` | Latest stable (Apr 2026) |
+
+Versions sourced from `aws eks describe-addon-versions --kubernetes-version 1.35` and the [CloudNativePG releases page](https://cloudnative-pg.io/releases/).
+
+---
+
+## 0. Already running? Connect first
 
 ```bash
-aws eks describe-cluster --region eu-west-3 --name loonaris-db-cluster --query 'cluster.status' --output text
+aws eks describe-cluster \
+  --region eu-west-3 \
+  --name loonaris-db-cluster \
+  --query 'cluster.status' --output text
 ```
 
-If result is `ACTIVE`, connect kubeconfig:
+If `ACTIVE`, update kubeconfig and verify:
 
 ```bash
 aws eks update-kubeconfig --region eu-west-3 --name loonaris-db-cluster
@@ -20,123 +42,94 @@ kubectl get nodes
 kubectl get pods -A
 ```
 
-If result is `ResourceNotFoundException`, create the cluster (see Step 2).
+If `ResourceNotFoundException`, proceed to Step 2.
 
-Cluster details from current config:
-
-- Cluster name: `loonaris-db-cluster`
-- Region: `eu-west-3`
-- Kubernetes version: `1.32`
+---
 
 ## 1. Prerequisites
 
-Install and configure:
-
-- `aws` CLI (authenticated to your AWS account)
+- `aws` CLI — authenticated (`aws sts get-caller-identity`)
 - `eksctl`
 - `kubectl`
 
-Quick checks:
+---
+
+## 2. Create the cluster
 
 ```bash
-aws sts get-caller-identity
-eksctl version
-kubectl version --client
+eksctl create cluster -f clusterv1-t3.small.yaml
 ```
 
-Developer note:
-
-- If the cluster already exists, do not run the create command again.
-- You can check first with:
+Dry-run first if needed:
 
 ```bash
-aws eks describe-cluster --region eu-west-3 --name loonaris-db-cluster --query 'cluster.status' --output text
+eksctl create cluster -f clusterv1-t3.small.yaml --dry-run
 ```
 
-If the command returns `ACTIVE`, skip Step 2 and go directly to Step 3.
+> Do not run create if the cluster already exists.
 
-## 2. Deploy The Cluster
+---
 
-From this repository root:
+## 3. Configure access and install operators
+
+Copy the env template and fill in values:
 
 ```bash
-eksctl create cluster -f cluster.yaml
+cp .env.example .env
 ```
 
-Optional pre-check before create:
+`.env` variables:
+
+| Variable | Description |
+|---|---|
+| `AWS_REGION` | AWS region of the cluster |
+| `CLUSTER_NAME` | EKS cluster name |
+| `AWS_ACCOUNT_ID` | 12-digit AWS account ID |
+| `CLUSTER_USERS` | Comma-separated IAM usernames to grant admin access |
+
+Then run:
 
 ```bash
-eksctl create cluster -f cluster.yaml --dry-run
+bash admin-config.sh
 ```
 
-## 3. Connect A User To The Cluster
+This script does three things:
 
-### Option A: Current AWS identity (same machine/user)
+1. **EKS access entries** — creates an access entry and attaches `AmazonEKSClusterAdminPolicy` for each user in `CLUSTER_USERS`
+2. **aws-auth ConfigMap** — patches `mapUsers` in `kube-system/aws-auth` to grant `system:masters` via the legacy ConfigMap path (keeps `mapRoles` untouched)
+3. **CloudNativePG** — installs the CNPG operator (`release-1.29`)
 
-`eksctl` usually updates kubeconfig during creation. To refresh manually:
+---
 
-```bash
-aws eks update-kubeconfig --region eu-west-3 --name loonaris-db-cluster
-```
+## 4. Developer kubeconfig setup
 
-Verify access:
-
-```bash
-kubectl get nodes
-kubectl get pods -A
-```
-
-### Option B: Another IAM user/role
-
-1. Ensure that IAM principal has EKS access (recommended: EKS Access Entries).
-2. On that user machine, run:
+Each user runs this on their own machine:
 
 ```bash
 aws eks update-kubeconfig --region eu-west-3 --name loonaris-db-cluster
 kubectl get nodes
 ```
 
-If access is denied, add the principal to the cluster using EKS access management, then retry.
+---
 
-## 4. Delete The Cluster
-
-Delete everything created by this config:
+## 5. Delete the cluster
 
 ```bash
-eksctl delete cluster -f cluster.yaml
+eksctl delete cluster -f clusterv1-t3.small.yaml
 ```
 
-If needed, you can also delete by name and region:
+Or by name:
 
 ```bash
 eksctl delete cluster --name loonaris-db-cluster --region eu-west-3
 ```
 
-## 5. Troubleshooting
+---
 
-- `only 0 zones discovered`: instance type not available in selected AZs.
-- `AccessDenied`: missing IAM permissions for EKS/EC2/CloudFormation/IAM.
-- `kubectl` cannot connect: rerun `aws eks update-kubeconfig ...` and verify AWS credentials/profile.
+## 6. Troubleshooting
 
-## 6. Multi-Tenant NetworkPolicies (Calico)
+- `only 0 zones discovered` — instance type not available in the selected AZs, adjust the cluster yaml.
+- `AccessDenied` — missing IAM permissions for EKS / EC2 / CloudFormation / IAM.
+- `kubectl` cannot connect — rerun `aws eks update-kubeconfig ...` and verify AWS credentials.
+- User can't access cluster after script — confirm both access entry (Step 3.1) and `aws-auth` patch (Step 3.2) succeeded in the script output.
 
-This repository now includes a reusable tenant template:
-
-- `calico/networkpolicies-template.yaml`
-- `calico/apply-tenant-networkpolicies.sh`
-
-Apply policies for multiple tenant namespaces:
-
-```bash
-bash calico/apply-tenant-networkpolicies.sh tenant-1 tenant-2 tenant-3
-```
-
-Requirements:
-
-- `kubectl`
-- `envsubst` (from `gettext`)
-
-Notes:
-
-- `tenant-isolation` and `deny-cross-tenant` are rendered per tenant namespace.
-- `sni-router-egress` remains a shared policy in namespace `sni-router`.
