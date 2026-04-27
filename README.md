@@ -6,7 +6,22 @@ Cluster definition and admin tooling for the loonaris EKS cluster on AWS (`eu-we
 |---|---|
 | Cluster | `loonaris-db-cluster` |
 | Region | `eu-west-3` |
-| Kubernetes | `1.32` |
+| Kubernetes | `1.35` |
+
+## Versions
+
+All versions are pinned — never `latest` in production.
+
+| Component | Version | Notes |
+|---|---|---|
+| Kubernetes | `1.35` | Latest EKS release (Jan 2026), standard support until ~Mar 2027 |
+| vpc-cni | `v1.21.1-eksbuild.7` | Latest patch for 1.35 |
+| coredns | `v1.14.2-eksbuild.4` | Latest available for 1.35 |
+| kube-proxy | `v1.35.3-eksbuild.5` | Tracks Kubernetes minor version |
+| aws-ebs-csi-driver | `v1.59.0-eksbuild.1` | Latest stable |
+| CloudNativePG | `1.29.0` | Latest stable (Apr 2026) |
+
+Versions sourced from `aws eks describe-addon-versions --kubernetes-version 1.35` and the [CloudNativePG releases page](https://cloudnative-pg.io/releases/).
 
 ---
 
@@ -69,6 +84,7 @@ cp .env.example .env
 |---|---|
 | `AWS_REGION` | AWS region of the cluster |
 | `CLUSTER_NAME` | EKS cluster name |
+| `AWS_ACCOUNT_ID` | 12-digit AWS account ID |
 | `CLUSTER_USERS` | Comma-separated IAM usernames to grant admin access |
 
 Then run:

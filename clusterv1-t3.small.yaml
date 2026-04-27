@@ -90,20 +90,20 @@ managedNodeGroups:
 addons:
   #Plugin reseau AWS VPC CNI.
   - name: vpc-cni
-    version: latest
+    version: v1.21.1-eksbuild.7
     #NetworkPolicy desactive pour eviter problemes avec Calico
     configurationValues: '{"enableNetworkPolicy":"false"}'
 
   # DNS interne du cluster.
   - name: coredns
-    version: latest
+    version: v1.14.2-eksbuild.4
 
   # Routage reseau Kubernetes (iptables/ipvs selon config).
   - name: kube-proxy
-    version: latest
+    version: v1.35.3-eksbuild.5
 
   # Driver CSI EBS pour provisionner des volumes persistants AWS EBS.
   - name: aws-ebs-csi-driver
-    version: latest
+    version: v1.59.0-eksbuild.1
     wellKnownPolicies:
       ebsCSIController: true
