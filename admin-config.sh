@@ -50,6 +50,13 @@ kubectl patch cm aws-auth -n kube-system --patch-file "$tmp"
 rm -f "$tmp"
 echo "aws-auth ConfigMap updated."
 
+# installing Calico (policy-only mode — VPC CNI keeps control of networking)
+echo "Installing Tigera operator..."
+kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.3/manifests/tigera-operator.yaml
+echo "Applying Calico Installation CR..."
+kubectl apply -f calico/calico-install.yaml
+echo "Calico installed."
+
 #installing CloudNativePG
 echo "Installing CloudNativePG operator..."
 kubectl apply --server-side -f \

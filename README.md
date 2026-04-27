@@ -20,6 +20,7 @@ All versions are pinned — never `latest` in production.
 | kube-proxy | `v1.35.3-eksbuild.5` | Tracks Kubernetes minor version |
 | aws-ebs-csi-driver | `v1.59.0-eksbuild.1` | Latest stable |
 | CloudNativePG | `1.29.0` | Latest stable (Apr 2026) |
+| Calico (Tigera operator) | `v3.29.x` | Policy-only mode — VPC CNI handles networking |
 
 Versions sourced from `aws eks describe-addon-versions --kubernetes-version 1.35` and the [CloudNativePG releases page](https://cloudnative-pg.io/releases/).
 
@@ -93,11 +94,12 @@ Then run:
 bash admin-config.sh
 ```
 
-This script does three things:
+This script does four things:
 
 1. **EKS access entries** — creates an access entry and attaches `AmazonEKSClusterAdminPolicy` for each user in `CLUSTER_USERS`
 2. **aws-auth ConfigMap** — patches `mapUsers` in `kube-system/aws-auth` to grant `system:masters` via the legacy ConfigMap path (keeps `mapRoles` untouched)
-3. **CloudNativePG** — installs the CNPG operator (`release-1.29`)
+3. **Calico** — installs the Tigera operator and applies `calico/calico-install.yaml` (policy-only mode)
+4. **CloudNativePG** — installs the CNPG operator (`release-1.29`)
 
 ---
 
