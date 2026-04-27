@@ -9,13 +9,13 @@ else
   exit 1
 fi
 
-if [ -z "$AWS_REGION" ] || [ -z "$CLUSTER_NAME" ] || [ -z "$CLUSTER_USERS" ]; then
-  echo "[ERR] Missing required variables. Ensure AWS_REGION, CLUSTER_NAME and CLUSTER_USERS are set in .env."
+if [ -z "$AWS_REGION" ] || [ -z "$CLUSTER_NAME" ] || [ -z "$AWS_ACCOUNT_ID" ] || [ -z "$CLUSTER_USERS" ]; then
+  echo "[ERR] Missing required variables. Ensure AWS_REGION, CLUSTER_NAME, AWS_ACCOUNT_ID and CLUSTER_USERS are set in .env."
   exit 1
 fi
 
 IFS=',' read -r -a users_names <<< "$CLUSTER_USERS"
-account=$(aws sts get-caller-identity --query "Account" --output text)
+account="$AWS_ACCOUNT_ID"
 
 # the eks cluster uses the API mode and ConfigMap you can check it by this command:
 # aws eks describe cluster --name loonaris-db-cluster --region eu-west-3 --query 'cluster.accessConfig'
