@@ -43,7 +43,7 @@ iam:
 
 #nodes config
 managedNodeGroups:
-  # 2 node (core k8s).
+  # 1 node (core k8s).
   - name: system-ng
     instanceType: c7i-flex.large
     desiredCapacity: 1
