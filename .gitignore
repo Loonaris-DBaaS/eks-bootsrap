@@ -6,3 +6,5 @@
 *.tmp
 *.bak
 *.swp
+__pycache__/
+venv/

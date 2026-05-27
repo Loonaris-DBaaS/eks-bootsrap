@@ -1,0 +1,11 @@
+name: loonaris-eks
+description: EKS cluster (loonaris-db-cluster) in eu-west-3 with IRSA, managed node groups, and core addons.
+runtime:
+  name: python
+  options:
+    toolchain: pip
+    virtualenv: venv
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: python
