@@ -8,3 +8,9 @@
 *.swp
 __pycache__/
 venv/
+
+# Local and generated files
+kubeconfig.yaml
+pulumi-eks/kubeconfig.yaml
+docs/
+generate_diagram.py
