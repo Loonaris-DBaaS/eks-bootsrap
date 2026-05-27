@@ -1,6 +1,6 @@
 # EKS Bootstrap — loonaris-db-cluster
 
-Cluster definition and admin tooling for the loonaris EKS cluster on AWS (`eu-west-3`).
+Cluster definition and infrastructure-as-code (IaC) for the loonaris EKS cluster on AWS (`eu-west-3`) using **Pulumi** (Python).
 
 | | |
 |---|---|
@@ -8,130 +8,84 @@ Cluster definition and admin tooling for the loonaris EKS cluster on AWS (`eu-we
 | Region | `eu-west-3` |
 | Kubernetes | `1.35` |
 
-## Versions
+## Architecture
 
-All versions are pinned — never `latest` in production.
+This project provisions the following AWS infrastructure:
+1. **Network**: A custom VPC with public subnets, an Internet Gateway, and a public route table.
+2. **IAM**: Roles for the EKS control plane and worker nodes.
+3. **Control Plane**: The EKS cluster itself.
+4. **OIDC Provider**: Required for IAM Roles for Service Accounts (IRSA).
+5. **Addons & IRSA**: 
+   - VPC CNI, CoreDNS, kube-proxy.
+   - EBS CSI Driver (via EKS Addons + IRSA role).
+   - AWS Load Balancer Controller IRSA role.
+   - Cert-Manager, External-DNS IRSA roles ready.
 
-| Component | Version | Notes |
-|---|---|---|
-| Kubernetes | `1.35` | Latest EKS release (Jan 2026), standard support until ~Mar 2027 |
-| vpc-cni | `v1.21.1-eksbuild.7` | Latest patch for 1.35 |
-| coredns | `v1.14.2-eksbuild.4` | Latest available for 1.35 |
-| kube-proxy | `v1.35.3-eksbuild.5` | Tracks Kubernetes minor version |
-| aws-ebs-csi-driver | `v1.59.0-eksbuild.1` | Latest stable |
-| CloudNativePG | `1.29.0` | Latest stable (Apr 2026) |
-| Calico (Tigera operator) | `v3.29.x` | Policy-only mode — VPC CNI handles networking |
+## Prerequisites
 
-Versions sourced from `aws eks describe-addon-versions --kubernetes-version 1.35` and the [CloudNativePG releases page](https://cloudnative-pg.io/releases/).
-
----
-
-## 0. Already running? Connect first
-
-```bash
-aws eks describe-cluster \
-  --region eu-west-3 \
-  --name loonaris-db-cluster \
-  --query 'cluster.status' --output text
-```
-
-If `ACTIVE`, update kubeconfig and verify:
-
-```bash
-aws eks update-kubeconfig --region eu-west-3 --name loonaris-db-cluster
-kubectl get nodes
-kubectl get pods -A
-```
-
-If `ResourceNotFoundException`, proceed to Step 2.
+- `aws` CLI — authenticated (`aws sts get-caller-identity`).
+- `pulumi` CLI.
+- `python3` and `venv`.
+- `kubectl`.
 
 ---
 
-## 1. Prerequisites
+## 1. Setup Environment
 
-- `aws` CLI — authenticated (`aws sts get-caller-identity`)
-- `eksctl`
-- `kubectl`
+Navigate to the IaC directory and prepare the Python environment:
+
+```bash
+cd pulumi-eks
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
 
 ---
 
-## 2. Create the cluster
+## 2. Deploy Infrastructure
+
+Run Pulumi to preview and execute the changes:
 
 ```bash
-eksctl create cluster -f clusterv1-t3.small.yaml
+cd pulumi-eks
+pulumi up
 ```
 
-Dry-run first if needed:
-
-```bash
-eksctl create cluster -f clusterv1-t3.small.yaml --dry-run
-```
-
-> Do not run create if the cluster already exists.
+> **Note:** The script may take 15-20 minutes to spin up the VPC, EKS Control Plane, and Node Groups.
 
 ---
 
-## 3. Configure access and install operators
+## 3. Connect to the Cluster
 
-Copy the env template and fill in values:
-
-```bash
-cp .env.example .env
-```
-
-`.env` variables:
-
-| Variable | Description |
-|---|---|
-| `AWS_REGION` | AWS region of the cluster |
-| `CLUSTER_NAME` | EKS cluster name |
-| `AWS_ACCOUNT_ID` | 12-digit AWS account ID |
-| `CLUSTER_USERS` | Comma-separated IAM usernames to grant admin access |
-
-Then run:
-
-```bash
-bash admin-config.sh
-```
-
-This script does four things:
-
-1. **EKS access entries** — creates an access entry and attaches `AmazonEKSClusterAdminPolicy` for each user in `CLUSTER_USERS`
-2. **aws-auth ConfigMap** — patches `mapUsers` in `kube-system/aws-auth` to grant `system:masters` via the legacy ConfigMap path (keeps `mapRoles` untouched)
-3. **Calico** — installs the Tigera operator and applies `calico/calico-install.yaml` (policy-only mode)
-4. **CloudNativePG** — installs the CNPG operator (`release-1.29`)
-
----
-
-## 4. Developer kubeconfig setup
-
-Each user runs this on their own machine:
+Once Pulumi finishes, you can configure your `kubectl` easily using the AWS CLI:
 
 ```bash
 aws eks update-kubeconfig --region eu-west-3 --name loonaris-db-cluster
 kubectl get nodes
 ```
 
----
-
-## 5. Delete the cluster
-
-```bash
-eksctl delete cluster -f clusterv1-t3.small.yaml
-```
-
-Or by name:
-
-```bash
-eksctl delete cluster --name loonaris-db-cluster --region eu-west-3
-```
+Alternatively, `pulumi up` generates a `kubeconfig.yaml` file natively at `pulumi-eks/kubeconfig.yaml`.
 
 ---
 
-## 6. Troubleshooting
+## 4. Install CloudNativePG
 
-- `only 0 zones discovered` — instance type not available in the selected AZs, adjust the cluster yaml.
-- `AccessDenied` — missing IAM permissions for EKS / EC2 / CloudFormation / IAM.
-- `kubectl` cannot connect — rerun `aws eks update-kubeconfig ...` and verify AWS credentials.
-- User can't access cluster after script — confirm both access entry (Step 3.1) and `aws-auth` patch (Step 3.2) succeeded in the script output.
+After the cluster is running, install the CNPG operator:
 
+```bash
+# Return to root directory
+cd ..
+bash install-cnpg.sh
+```
+
+---
+
+## 5. Teardown
+
+To destroy the cluster and all associated resources:
+
+```bash
+cd pulumi-eks
+pulumi destroy
+```
